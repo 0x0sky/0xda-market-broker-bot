@@ -1,0 +1,55 @@
+require_relative "test_helper"
+require "json"
+require "rack/mock"
+require "zero_x_da/market_broker_bot/web_app"
+
+class WebAppTest < Minitest::Test
+  class Handler
+    attr_reader :updates
+
+    def initialize
+      @updates = []
+    end
+
+    def handle(update)
+      @updates << update
+    end
+  end
+
+  def setup
+    @handler = Handler.new
+    @client = Rack::MockRequest.new(
+      ZeroXDA::MarketBrokerBot::WebApp.new(
+        bot: @handler,
+        webhook_secret: "webhook-secret"
+      )
+    )
+  end
+
+  def test_has_no_public_health_route
+    assert_equal 404, @client.get("/health").status
+  end
+
+  def test_rejects_a_webhook_without_the_telegram_secret
+    response = @client.post(
+      "/telegram/webhook",
+      "CONTENT_TYPE" => "application/json",
+      input: JSON.generate(update_id: 1)
+    )
+
+    assert_equal 401, response.status
+    assert_empty @handler.updates
+  end
+
+  def test_accepts_and_dispatches_a_verified_webhook
+    response = @client.post(
+      "/telegram/webhook",
+      "HTTP_X_TELEGRAM_BOT_API_SECRET_TOKEN" => "webhook-secret",
+      "CONTENT_TYPE" => "application/json",
+      input: JSON.generate(update_id: 1, message: { text: "/start" })
+    )
+
+    assert_equal 200, response.status
+    assert_equal 1, @handler.updates.first.fetch("update_id")
+  end
+end

@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: 0xda-market-broker-bot
+    runtime: docker
+    plan: free
+    region: frankfurt
+    envVars:
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: TELEGRAM_WEBHOOK_SECRET
+        generateValue: true
+      - key: MARKET_API_URL
+        value: https://zeroxda-market.onrender.com
+      - key: MARKET_OPERATOR_TOKEN
+        sync: false
+      - key: PUBLIC_URL
+        sync: false

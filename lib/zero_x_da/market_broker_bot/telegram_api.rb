@@ -1,0 +1,68 @@
+# frozen_string_literal: true
+
+require "json"
+require "net/http"
+require "timeout"
+require "uri"
+
+module ZeroXDA
+  module MarketBrokerBot
+    class TelegramAPI
+      class Error < StandardError; end
+
+      def initialize(token:)
+        raise ArgumentError, "Telegram token must not be empty" if token.to_s.empty?
+
+        @base_url = URI("https://api.telegram.org/bot#{token}/")
+      end
+
+      def send_message(chat_id:, text:, reply_markup: nil)
+        payload = { chat_id: chat_id, text: text }
+        payload[:reply_markup] = reply_markup if reply_markup
+        post("sendMessage", payload)
+      end
+
+      def set_webhook(url:, secret_token:)
+        post(
+          "setWebhook",
+          url: url,
+          secret_token: secret_token,
+          allowed_updates: %w[message callback_query],
+          drop_pending_updates: false
+        )
+      end
+
+      def set_commands(commands, scope: nil)
+        payload = { commands: commands }
+        payload[:scope] = scope if scope
+        post("setMyCommands", payload)
+      end
+
+      private
+
+      def post(method, payload)
+        uri = URI.join(@base_url, method)
+        request = Net::HTTP::Post.new(uri)
+        request["content-type"] = "application/json"
+        request.body = JSON.generate(payload)
+        response = Net::HTTP.start(
+          uri.host,
+          uri.port,
+          use_ssl: true,
+          open_timeout: 5,
+          read_timeout: 10
+        ) { |http| http.request(request) }
+        document = JSON.parse(response.body)
+        unless response.is_a?(Net::HTTPSuccess) && document["ok"]
+          raise Error, document["description"] || "Telegram API request failed"
+        end
+
+        document["result"]
+      rescue Error
+        raise
+      rescue JSON::ParserError, IOError, SystemCallError, Timeout::Error => error
+        raise Error, "Telegram API request failed: #{error.message}"
+      end
+    end
+  end
+end
