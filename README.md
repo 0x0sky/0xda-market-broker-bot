@@ -1,6 +1,6 @@
 # 0xda-market Broker Bot
 
-Dedicated Telegram operator service for `zeroxda-market`.
+Dedicated Telegram operator service for `0xda-market`.
 
 The first implementation authenticates a Telegram identity as a trusted
 `broker` through the market operator API and controls whether that broker is
