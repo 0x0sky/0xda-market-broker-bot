@@ -14,8 +14,15 @@ ready to receive new requests.
 - `/status` — show the persisted market role and current bot status.
 
 The default Telegram menu exposes only `/start`. After authentication, the
-broker's private chat scope also receives `/ready`, `/pause` and `/status`.
-The service intentionally has no public `/health` route.
+private chat command scope follows the current broker status:
+
+- `paused` — `/ready` and `/status`;
+- `ready` — `/pause` and `/status`;
+- `busy` — `/status` only.
+
+The authorization command disappears after authentication. Commands typed
+manually cannot move a busy broker out of `busy`. The service intentionally has
+no public `/health` route.
 
 Broker presence is currently process-local. Durable presence and pending-task
 notifications belong to the next queue-delivery step; the broker identity and

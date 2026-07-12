@@ -14,7 +14,15 @@ class BrokerRegistryTest < Minitest::Test
     registry = ZeroXDA::MarketBrokerBot::BrokerRegistry.new
 
     assert_raises(ArgumentError) do
-      registry.set_status(telegram_user_id: 77, chat_id: 770, status: "busy")
+      registry.set_status(telegram_user_id: 77, chat_id: 770, status: "offline")
     end
+  end
+
+  def test_tracks_busy_status
+    registry = ZeroXDA::MarketBrokerBot::BrokerRegistry.new
+
+    registry.set_status(telegram_user_id: 77, chat_id: 770, status: "busy")
+
+    assert_equal "busy", registry.status(77)
   end
 end

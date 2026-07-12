@@ -41,12 +41,36 @@ class BotTest < Minitest::Test
     assert_includes @telegram.messages.last.fetch(:text), "status: ready"
   end
 
-  def test_authenticated_chat_receives_broker_command_scope
+  def test_ready_chat_hides_start_and_ready_commands
     @bot.handle(update("/start"))
 
     command_set = @telegram.command_sets.last
     assert_equal({ type: "chat", chat_id: "770" }, command_set.fetch(:scope))
-    assert_equal %w[start ready pause status], command_set.fetch(:commands).map { |item| item.fetch(:command) }
+    assert_equal %w[pause status], command_names(command_set)
+  end
+
+  def test_paused_chat_shows_ready_but_hides_start_and_pause_commands
+    @bot.handle(update("/pause"))
+
+    assert_equal %w[ready status], command_names(@telegram.command_sets.last)
+  end
+
+  def test_busy_chat_shows_only_status
+    @registry.set_status(telegram_user_id: 77, chat_id: 770, status: "busy")
+
+    @bot.handle(update("/status"))
+
+    assert_equal %w[status], command_names(@telegram.command_sets.last)
+    assert_includes @telegram.messages.last.fetch(:text), "status: busy"
+  end
+
+  def test_commands_cannot_move_a_busy_broker_out_of_busy
+    @registry.set_status(telegram_user_id: 77, chat_id: 770, status: "busy")
+
+    %w[/start /ready /pause].each { |command| @bot.handle(update(command)) }
+
+    assert_equal "busy", @registry.status(77)
+    assert_equal %w[status], command_names(@telegram.command_sets.last)
   end
 
   def test_ignores_unknown_messages_and_non_private_chats
@@ -64,6 +88,10 @@ class BotTest < Minitest::Test
   end
 
   private
+
+  def command_names(command_set)
+    command_set.fetch(:commands).map { |item| item.fetch(:command) }
+  end
 
   def update(text, chat_type: "private")
     {
