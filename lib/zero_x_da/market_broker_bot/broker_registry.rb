@@ -6,7 +6,7 @@ module ZeroXDA
   module MarketBrokerBot
     class BrokerRegistry
       Broker = Data.define(:telegram_user_id, :chat_id, :status)
-      STATUSES = %w[ready paused].freeze
+      STATUSES = %w[ready busy paused].freeze
 
       def initialize
         @brokers = {}

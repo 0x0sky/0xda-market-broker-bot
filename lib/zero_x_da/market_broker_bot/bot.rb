@@ -9,10 +9,15 @@ module ZeroXDA
       START_COMMANDS = [
         { command: "start", description: "авторизація брокера" }
       ].freeze
-      BROKER_COMMANDS = [
-        { command: "start", description: "авторизація брокера" },
+      PAUSED_COMMANDS = [
         { command: "ready", description: "приймати нові заявки" },
+        { command: "status", description: "поточний статус" }
+      ].freeze
+      READY_COMMANDS = [
         { command: "pause", description: "призупинити заявки" },
+        { command: "status", description: "поточний статус" }
+      ].freeze
+      BUSY_COMMANDS = [
         { command: "status", description: "поточний статус" }
       ].freeze
 
@@ -43,12 +48,21 @@ module ZeroXDA
 
       def authenticate_and_set_status(message, status)
         user = authenticate(message)
+        telegram_user_id = message.fetch("from").fetch("id")
+        chat_id = message.fetch("chat").fetch("id")
+        current_status = @registry.status(telegram_user_id)
+        if current_status == "busy"
+          sync_commands(chat_id, current_status)
+          send_message(chat_id, status_message(user, current_status))
+          return
+        end
+
         broker = @registry.set_status(
-          telegram_user_id: message.fetch("from").fetch("id"),
-          chat_id: message.fetch("chat").fetch("id"),
+          telegram_user_id: telegram_user_id,
+          chat_id: chat_id,
           status: status
         )
-        sync_commands(broker.chat_id)
+        sync_commands(broker.chat_id, broker.status)
         send_message(broker.chat_id, status_message(user, broker.status))
       end
 
@@ -56,8 +70,9 @@ module ZeroXDA
         user = authenticate(message)
         telegram_user_id = message.fetch("from").fetch("id")
         chat_id = message.fetch("chat").fetch("id")
-        sync_commands(chat_id)
-        send_message(chat_id, status_message(user, @registry.status(telegram_user_id)))
+        status = @registry.status(telegram_user_id)
+        sync_commands(chat_id, status)
+        send_message(chat_id, status_message(user, status))
       end
 
       def authenticate(message)
@@ -70,7 +85,7 @@ module ZeroXDA
       def status_message(user, status)
         role = user.dig("attributes", "role")
         uuid = user.fetch("id")
-        indicator = status == "ready" ? "🟢" : "⚪️"
+        indicator = { "ready" => "🟢", "busy" => "🟠", "paused" => "⚪️" }.fetch(status)
         <<~TEXT.strip
           zeroxda-market · broker
 
@@ -81,13 +96,22 @@ module ZeroXDA
         TEXT
       end
 
-      def sync_commands(chat_id)
+      def sync_commands(chat_id, status)
         @telegram_api.set_commands(
-          BROKER_COMMANDS,
+          commands_for(status),
           scope: { type: "chat", chat_id: chat_id }
         )
       rescue TelegramAPI::Error => error
         warn "command menu sync failed: #{error.message}"
+      end
+
+      def commands_for(status)
+        case status
+        when "paused" then PAUSED_COMMANDS
+        when "ready" then READY_COMMANDS
+        when "busy" then BUSY_COMMANDS
+        else raise ArgumentError, "broker status is invalid"
+        end
       end
 
       def parse_command(text)
