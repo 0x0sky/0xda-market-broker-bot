@@ -10,7 +10,8 @@ class BotTest < Minitest::Test
     @bot = ZeroXDA::MarketBrokerBot::Bot.new(
       market_api: @market,
       telegram_api: @telegram,
-      registry: @registry
+      registry: @registry,
+      clock: -> { Time.utc(2026, 7, 12, 0, 0, 1) }
     )
   end
 
@@ -64,6 +65,32 @@ class BotTest < Minitest::Test
     assert_includes @telegram.messages.last.fetch(:text), "status: busy"
   end
 
+  def test_admin_menu_contains_server_status_for_every_broker_state
+    %w[/start /pause].each do |command|
+      @bot.handle(update(command, user_id: 99, chat_id: 990))
+
+      assert_includes command_names(@telegram.command_sets.last), "servers"
+    end
+  end
+
+  def test_admin_can_see_server_status
+    @bot.handle(update("/servers", user_id: 99, chat_id: 990))
+
+    text = @telegram.messages.last.fetch(:text)
+    assert_includes text, "market core: ok ✅"
+    assert_includes text, "core time: 2026-07-12T00:00:00.000000Z"
+    assert_includes text, "broker bot: ok ✅"
+    assert_includes text, "bot time: 2026-07-12T00:00:01.000000Z"
+  end
+
+  def test_non_admin_cannot_see_or_execute_server_status
+    @bot.handle(update("/servers"))
+
+    assert_equal "доступ заборонено.", @telegram.messages.last.fetch(:text)
+    assert_equal 0, @market.health_requests
+    refute_includes command_names(@telegram.command_sets.last), "servers"
+  end
+
   def test_commands_cannot_move_a_busy_broker_out_of_busy
     @registry.set_status(telegram_user_id: 77, chat_id: 770, status: "busy")
 
@@ -93,17 +120,17 @@ class BotTest < Minitest::Test
     command_set.fetch(:commands).map { |item| item.fetch(:command) }
   end
 
-  def update(text, chat_type: "private")
+  def update(text, chat_type: "private", user_id: 77, chat_id: 770)
     {
       "message" => {
         "text" => text,
         "from" => {
-          "id" => 77,
+          "id" => user_id,
           "username" => "zero",
           "first_name" => "Sasha",
           "language_code" => "uk"
         },
-        "chat" => { "id" => 770, "type" => chat_type }
+        "chat" => { "id" => chat_id, "type" => chat_type }
       }
     }
   end

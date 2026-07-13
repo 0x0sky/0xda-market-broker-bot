@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require "time"
 require_relative "market_api"
 require_relative "telegram_api"
 
@@ -20,11 +21,15 @@ module ZeroXDA
       BUSY_COMMANDS = [
         { command: "status", description: "поточний статус" }
       ].freeze
+      ADMIN_COMMANDS = [
+        { command: "servers", description: "стан серверів" }
+      ].freeze
 
-      def initialize(market_api:, telegram_api:, registry:)
+      def initialize(market_api:, telegram_api:, registry:, clock: -> { Time.now.utc })
         @market_api = market_api
         @telegram_api = telegram_api
         @registry = registry
+        @clock = clock
       end
 
       def handle(update)
@@ -39,6 +44,8 @@ module ZeroXDA
           authenticate_and_set_status(message, "paused")
         when "/status"
           show_status(message)
+        when "/servers"
+          show_servers(message)
         end
       rescue KeyError, ArgumentError, MarketAPI::Error => error
         notify_failure(message, error)
@@ -52,7 +59,7 @@ module ZeroXDA
         chat_id = message.fetch("chat").fetch("id")
         current_status = @registry.status(telegram_user_id)
         if current_status == "busy"
-          sync_commands(chat_id, current_status)
+          sync_commands(chat_id, current_status, user)
           send_message(chat_id, status_message(user, current_status))
           return
         end
@@ -62,7 +69,7 @@ module ZeroXDA
           chat_id: chat_id,
           status: status
         )
-        sync_commands(broker.chat_id, broker.status)
+        sync_commands(broker.chat_id, broker.status, user)
         send_message(broker.chat_id, status_message(user, broker.status))
       end
 
@@ -71,8 +78,30 @@ module ZeroXDA
         telegram_user_id = message.fetch("from").fetch("id")
         chat_id = message.fetch("chat").fetch("id")
         status = @registry.status(telegram_user_id)
-        sync_commands(chat_id, status)
+        sync_commands(chat_id, status, user)
         send_message(chat_id, status_message(user, status))
+      end
+
+      def show_servers(message)
+        user = authenticate(message)
+        telegram_user_id = message.fetch("from").fetch("id")
+        chat_id = message.fetch("chat").fetch("id")
+        sync_commands(chat_id, @registry.status(telegram_user_id), user)
+        return send_message(chat_id, "доступ заборонено.") unless admin?(user)
+
+        health = @market_api.health
+        core_status = health.fetch("status", "unknown")
+        core_time = health.fetch("server_time", "—")
+        text = <<~TEXT.strip
+          zeroxda-market / servers
+
+          market core: #{status_label(core_status)}
+          core time: #{core_time}
+
+          broker bot: ok ✅
+          bot time: #{timestamp(@clock.call)}
+        TEXT
+        send_message(chat_id, text)
       end
 
       def authenticate(message)
@@ -96,22 +125,37 @@ module ZeroXDA
         TEXT
       end
 
-      def sync_commands(chat_id, status)
+      def sync_commands(chat_id, status, user)
         @telegram_api.set_commands(
-          commands_for(status),
+          commands_for(status, user),
           scope: { type: "chat", chat_id: chat_id }
         )
       rescue TelegramAPI::Error => error
         warn "command menu sync failed: #{error.message}"
       end
 
-      def commands_for(status)
-        case status
-        when "paused" then PAUSED_COMMANDS
-        when "ready" then READY_COMMANDS
-        when "busy" then BUSY_COMMANDS
-        else raise ArgumentError, "broker status is invalid"
-        end
+      def commands_for(status, user)
+        commands = case status
+                   when "paused" then PAUSED_COMMANDS
+                   when "ready" then READY_COMMANDS
+                   when "busy" then BUSY_COMMANDS
+                   else raise ArgumentError, "broker status is invalid"
+                   end
+        admin?(user) ? [*commands, *ADMIN_COMMANDS] : commands
+      end
+
+      def admin?(user)
+        user.dig("attributes", "role") == "admin"
+      end
+
+      def status_label(status)
+        status == "ok" ? "ok ✅" : "#{status} ❌"
+      end
+
+      def timestamp(value)
+        raise ArgumentError, "clock must return a Time" unless value.is_a?(Time)
+
+        value.utc.iso8601(6)
       end
 
       def parse_command(text)
