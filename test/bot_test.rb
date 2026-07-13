@@ -24,6 +24,8 @@ class BotTest < Minitest::Test
     assert_includes text, "авторизація успішна"
     assert_includes text, "role: broker"
     assert_includes text, "status: ready"
+    refute_includes text, "zeroxda-market · broker"
+    refute_includes text, "user:"
   end
 
   def test_pause_authenticates_and_pauses_broker

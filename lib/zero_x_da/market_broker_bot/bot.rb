@@ -113,14 +113,10 @@ module ZeroXDA
 
       def status_message(user, status)
         role = user.dig("attributes", "role")
-        uuid = user.fetch("id")
         indicator = { "ready" => "🟢", "busy" => "🟠", "paused" => "⚪️" }.fetch(status)
         <<~TEXT.strip
-          zeroxda-market · broker
-
           авторизація успішна ✅
           role: #{role}
-          user: #{uuid[0, 8]}
           status: #{status} #{indicator}
         TEXT
       end
