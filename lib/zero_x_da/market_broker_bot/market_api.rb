@@ -37,14 +37,15 @@ module ZeroXDA
         document.fetch("data")
       end
 
+      def health
+        uri = URI.join(@base_url, "health")
+        request = Net::HTTP::Get.new(uri)
+        perform(uri, request)
+      end
+
       private
 
-      def post(path, payload)
-        uri = URI.join(@base_url, path)
-        request = Net::HTTP::Post.new(uri)
-        request["authorization"] = "Bearer #{@operator_token}"
-        request["content-type"] = "application/json"
-        request.body = JSON.generate(payload)
+      def perform(uri, request)
         response = Net::HTTP.start(
           uri.host,
           uri.port,
@@ -64,6 +65,15 @@ module ZeroXDA
         raise
       rescue JSON::ParserError, IOError, SystemCallError, Timeout::Error => error
         raise Error, "Market API request failed: #{error.message}"
+      end
+
+      def post(path, payload)
+        uri = URI.join(@base_url, path)
+        request = Net::HTTP::Post.new(uri)
+        request["authorization"] = "Bearer #{@operator_token}"
+        request["content-type"] = "application/json"
+        request.body = JSON.generate(payload)
+        perform(uri, request)
       end
     end
   end

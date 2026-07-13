@@ -12,6 +12,7 @@ ready to receive new requests.
 - `/ready` — receive new requests;
 - `/pause` — pause new request notifications;
 - `/status` — show the persisted market role and current bot status.
+- `/servers` — show core and broker-bot health with UTC server times (admin only).
 
 The default Telegram menu exposes only `/start`. After authentication, the
 private chat command scope follows the current broker status:
@@ -19,6 +20,10 @@ private chat command scope follows the current broker status:
 - `paused` — `/ready` and `/status`;
 - `ready` — `/pause` and `/status`;
 - `busy` — `/status` only.
+
+An administrator also receives `/servers` in every authenticated broker-state
+menu. Brokers do not see it, and manually typing it is denied after the
+persisted role is checked through the core API.
 
 The authorization command disappears after authentication. Commands typed
 manually cannot move a busy broker out of `busy`. The service intentionally has
