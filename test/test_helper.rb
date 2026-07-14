@@ -26,15 +26,27 @@ class FakeMarketAPI
 end
 
 class FakeTelegramAPI
-  attr_reader :messages, :command_sets
+  attr_reader :messages, :command_sets, :deleted_messages
 
   def initialize
     @messages = []
     @command_sets = []
+    @deleted_messages = []
   end
 
   def send_message(chat_id:, text:, reply_markup: nil)
-    @messages << { chat_id: chat_id, text: text, reply_markup: reply_markup }
+    message = {
+      "message_id" => @messages.length + 1,
+      chat_id: chat_id,
+      text: text,
+      reply_markup: reply_markup
+    }
+    @messages << message
+    message
+  end
+
+  def delete_message(chat_id:, message_id:)
+    @deleted_messages << { chat_id: chat_id, message_id: message_id }
   end
 
   def set_commands(commands, scope: nil)
