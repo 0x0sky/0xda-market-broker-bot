@@ -5,6 +5,16 @@ require "rack"
 
 module ZeroXDA
   module MarketBrokerBot
+    class AsyncDispatcher
+      def call(&task)
+        Thread.new do
+          task.call
+        rescue StandardError => error
+          warn "background update failed: #{error.class}: #{error.message}"
+        end.tap { |thread| thread.report_on_exception = false }
+      end
+    end
+
     class WebApp
       MAX_BODY_BYTES = 1_048_576
       JSON_HEADERS = {
@@ -12,11 +22,12 @@ module ZeroXDA
         "cache-control" => "no-store"
       }.freeze
 
-      def initialize(bot:, webhook_secret:)
+      def initialize(bot:, webhook_secret:, dispatcher: AsyncDispatcher.new)
         raise ArgumentError, "Webhook secret must not be empty" if webhook_secret.to_s.empty?
 
         @bot = bot
         @webhook_secret = webhook_secret
+        @dispatcher = dispatcher
       end
 
       def call(environment)
@@ -27,7 +38,8 @@ module ZeroXDA
           raw = request.body.read(MAX_BODY_BYTES + 1)
           return json_response(413, error: "payload_too_large") if raw.bytesize > MAX_BODY_BYTES
 
-          @bot.handle(JSON.parse(raw))
+          update = JSON.parse(raw)
+          @dispatcher.call { @bot.handle(update) }
           return json_response(200, status: "accepted")
         end
 
