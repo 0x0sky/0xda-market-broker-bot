@@ -26,8 +26,9 @@ menu. Brokers do not see it, and manually typing it is denied after the
 persisted role is checked through the core API.
 
 The authorization command disappears after authentication. Commands typed
-manually cannot move a busy broker out of `busy`. The service intentionally has
-no public `/health` route.
+manually cannot move a busy broker out of `busy`. Render and deployment
+automation use the public `/health` route, which reports service status and UTC
+server time without exposing broker or market data.
 
 Broker presence is currently process-local. Durable presence and pending-task
 notifications belong to the next queue-delivery step; the broker identity and
