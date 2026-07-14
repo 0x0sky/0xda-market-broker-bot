@@ -8,6 +8,11 @@ require "uri"
 module ZeroXDA
   module MarketBrokerBot
     class MarketAPI
+      OPEN_TIMEOUT = 10
+      READ_TIMEOUT = 75
+      MAX_REQUEST_ATTEMPTS = 2
+      TRANSIENT_ERRORS = [IOError, SystemCallError, Timeout::Error].freeze
+
       class Error < StandardError
         attr_reader :code
 
@@ -46,13 +51,7 @@ module ZeroXDA
       private
 
       def perform(uri, request)
-        response = Net::HTTP.start(
-          uri.host,
-          uri.port,
-          use_ssl: uri.scheme == "https",
-          open_timeout: 5,
-          read_timeout: 10
-        ) { |http| http.request(request) }
+        response = request_with_retry(uri, request)
         document = JSON.parse(response.body)
         return document if response.is_a?(Net::HTTPSuccess)
 
@@ -65,6 +64,29 @@ module ZeroXDA
         raise
       rescue JSON::ParserError, IOError, SystemCallError, Timeout::Error => error
         raise Error, "Market API request failed: #{error.message}"
+      end
+
+      def request_with_retry(uri, request)
+        attempts = 0
+
+        begin
+          attempts += 1
+          perform_http_request(uri, request)
+        rescue *TRANSIENT_ERRORS
+          retry if attempts < MAX_REQUEST_ATTEMPTS
+
+          raise
+        end
+      end
+
+      def perform_http_request(uri, request)
+        Net::HTTP.start(
+          uri.host,
+          uri.port,
+          use_ssl: uri.scheme == "https",
+          open_timeout: OPEN_TIMEOUT,
+          read_timeout: READ_TIMEOUT
+        ) { |http| http.request(request) }
       end
 
       def post(path, payload)
