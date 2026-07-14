@@ -7,6 +7,8 @@ require_relative "telegram_api"
 module ZeroXDA
   module MarketBrokerBot
     class Bot
+      SERVER_START_NOTICE = "сервер запускається…"
+      SERVER_START_NOTICE_DELAY = 3
       START_COMMANDS = [
         { command: "start", description: "авторизація брокера" }
       ].freeze
@@ -25,11 +27,18 @@ module ZeroXDA
         { command: "servers", description: "стан серверів" }
       ].freeze
 
-      def initialize(market_api:, telegram_api:, registry:, clock: -> { Time.now.utc })
+      def initialize(
+        market_api:,
+        telegram_api:,
+        registry:,
+        clock: -> { Time.now.utc },
+        server_start_notice_delay: SERVER_START_NOTICE_DELAY
+      )
         @market_api = market_api
         @telegram_api = telegram_api
         @registry = registry
         @clock = clock
+        @server_start_notice_delay = server_start_notice_delay
       end
 
       def handle(update)
@@ -37,21 +46,44 @@ module ZeroXDA
         return unless private_message?(message)
 
         command = parse_command(message["text"])
-        case command
-        when "/start", "/ready"
-          authenticate_and_set_status(message, "ready")
-        when "/pause"
-          authenticate_and_set_status(message, "paused")
-        when "/status"
-          show_status(message)
-        when "/servers"
-          show_servers(message)
+        if command
+          with_server_start_notice(message) do
+            case command
+            when "/start", "/ready"
+              authenticate_and_set_status(message, "ready")
+            when "/pause"
+              authenticate_and_set_status(message, "paused")
+            when "/status"
+              show_status(message)
+            when "/servers"
+              show_servers(message)
+            end
+          end
         end
       rescue KeyError, ArgumentError, MarketAPI::Error => error
         notify_failure(message, error)
       end
 
       private
+
+      def with_server_start_notice(message)
+        chat_id = message.fetch("chat").fetch("id")
+        completed = false
+        lock = Mutex.new
+        notifier = Thread.new do
+          sleep @server_start_notice_delay
+          send_message(chat_id, SERVER_START_NOTICE) unless lock.synchronize { completed }
+        rescue TelegramAPI::Error => error
+          warn "server start notice failed: #{error.message}"
+        end
+        notifier.report_on_exception = false
+        yield
+      ensure
+        if lock
+          lock.synchronize { completed = true }
+          notifier&.kill
+        end
+      end
 
       def authenticate_and_set_status(message, status)
         user = authenticate(message)
