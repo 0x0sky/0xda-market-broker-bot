@@ -11,7 +11,8 @@ ready to receive new requests.
 - `/start` — authenticate and become `ready`;
 - `/ready` — receive new requests;
 - `/pause` — pause new request notifications;
-- `/status` — show the persisted market role and current bot status.
+- `/status` — show the persisted market role and current bot status; the response
+  is removed after three seconds.
 - `/servers` — show core and broker-bot health with UTC server times (admin only).
 
 The default Telegram menu exposes only `/start`. After authentication, the

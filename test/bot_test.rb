@@ -11,7 +11,8 @@ class BotTest < Minitest::Test
       market_api: @market,
       telegram_api: @telegram,
       registry: @registry,
-      clock: -> { Time.utc(2026, 7, 12, 0, 0, 1) }
+      clock: -> { Time.utc(2026, 7, 12, 0, 0, 1) },
+      status_message_ttl: 0
     )
   end
 
@@ -24,6 +25,7 @@ class BotTest < Minitest::Test
     assert_includes text, "авторизація успішна"
     assert_includes text, "role: broker"
     assert_includes text, "status: ready"
+    assert_equal [{ chat_id: "770", message_id: 1 }], @telegram.deleted_messages
     refute_includes text, "zeroxda-market · broker"
     refute_includes text, "user:"
   end

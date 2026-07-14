@@ -9,6 +9,7 @@ module ZeroXDA
     class Bot
       SERVER_START_NOTICE = "0xda-market запускається…"
       SERVER_START_NOTICE_DELAY = 3
+      STATUS_MESSAGE_TTL = 3
       START_COMMANDS = [
         { command: "start", description: "авторизація брокера" }
       ].freeze
@@ -32,13 +33,15 @@ module ZeroXDA
         telegram_api:,
         registry:,
         clock: -> { Time.now.utc },
-        server_start_notice_delay: SERVER_START_NOTICE_DELAY
+        server_start_notice_delay: SERVER_START_NOTICE_DELAY,
+        status_message_ttl: STATUS_MESSAGE_TTL
       )
         @market_api = market_api
         @telegram_api = telegram_api
         @registry = registry
         @clock = clock
         @server_start_notice_delay = server_start_notice_delay
+        @status_message_ttl = status_message_ttl
       end
 
       def handle(update)
@@ -92,7 +95,7 @@ module ZeroXDA
         current_status = @registry.status(telegram_user_id)
         if current_status == "busy"
           sync_commands(chat_id, current_status, user)
-          send_message(chat_id, status_message(user, current_status))
+          send_status_message(chat_id, user, current_status)
           return
         end
 
@@ -103,7 +106,7 @@ module ZeroXDA
           role: user.dig("attributes", "role")
         )
         sync_commands(broker.chat_id, broker.status, user)
-        send_message(broker.chat_id, status_message(user, broker.status))
+        send_status_message(broker.chat_id, user, broker.status)
       end
 
       def show_status(message)
@@ -112,7 +115,7 @@ module ZeroXDA
         broker = @registry.fetch(telegram_user_id, chat_id: chat_id)
         user = { "attributes" => { "role" => broker.role } }
         sync_commands(chat_id, broker.status, user)
-        send_message(chat_id, status_message(user, broker.status))
+        send_status_message(chat_id, user, broker.status)
       end
 
       def show_servers(message)
@@ -152,6 +155,26 @@ module ZeroXDA
           role: #{role}
           status: #{status} #{indicator}
         TEXT
+      end
+
+      def send_status_message(chat_id, user, status)
+        message = send_message(chat_id, status_message(user, status))
+        schedule_message_deletion(chat_id, message)
+      end
+
+      def schedule_message_deletion(chat_id, message)
+        message_id = message&.fetch("message_id", nil)
+        return unless message_id
+
+        delete = -> { @telegram_api.delete_message(chat_id: chat_id, message_id: message_id) }
+        return delete.call if @status_message_ttl.zero?
+
+        Thread.new do
+          sleep @status_message_ttl
+          delete.call
+        rescue TelegramAPI::Error => error
+          warn "status message deletion failed: #{error.message}"
+        end.tap { |thread| thread.report_on_exception = false }
       end
 
       def sync_commands(chat_id, status, user)
