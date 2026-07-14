@@ -99,19 +99,20 @@ module ZeroXDA
         broker = @registry.set_status(
           telegram_user_id: telegram_user_id,
           chat_id: chat_id,
-          status: status
+          status: status,
+          role: user.dig("attributes", "role")
         )
         sync_commands(broker.chat_id, broker.status, user)
         send_message(broker.chat_id, status_message(user, broker.status))
       end
 
       def show_status(message)
-        user = authenticate(message)
         telegram_user_id = message.fetch("from").fetch("id")
         chat_id = message.fetch("chat").fetch("id")
-        status = @registry.status(telegram_user_id)
-        sync_commands(chat_id, status, user)
-        send_message(chat_id, status_message(user, status))
+        broker = @registry.fetch(telegram_user_id, chat_id: chat_id)
+        user = { "attributes" => { "role" => broker.role } }
+        sync_commands(chat_id, broker.status, user)
+        send_message(chat_id, status_message(user, broker.status))
       end
 
       def show_servers(message)

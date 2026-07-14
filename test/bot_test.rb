@@ -38,10 +38,21 @@ class BotTest < Minitest::Test
 
   def test_status_reports_current_status_without_changing_it
     @bot.handle(update("/ready"))
+    requests_before_status = @market.requests.length
     @bot.handle(update("/status"))
 
     assert_equal "ready", @registry.status(77)
     assert_includes @telegram.messages.last.fetch(:text), "status: ready"
+    assert_equal requests_before_status, @market.requests.length
+  end
+
+  def test_status_works_without_market_authentication_after_a_cold_start
+    @bot.handle(update("/status"))
+
+    text = @telegram.messages.last.fetch(:text)
+    assert_includes text, "role: broker"
+    assert_includes text, "status: paused"
+    assert_empty @market.requests
   end
 
   def test_ready_chat_hides_start_and_ready_commands
