@@ -48,12 +48,21 @@ module ZeroXDA
       end
 
       def health
-        uri = URI.join(@base_url, "health")
-        request = Net::HTTP::Get.new(uri)
-        perform(uri, request)
+        get("health", authenticated: false)
+      end
+
+      def products
+        get("operator/v1/products", authenticated: true).fetch("data")
       end
 
       private
+
+      def get(path, authenticated:)
+        uri = URI.join(@base_url, path)
+        request = Net::HTTP::Get.new(uri)
+        request["authorization"] = "Bearer #{@operator_token}" if authenticated
+        perform(uri, request)
+      end
 
       def perform(uri, request)
         response, document = request_with_retry(uri, request)

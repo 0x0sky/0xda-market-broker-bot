@@ -5,7 +5,7 @@ require "monitor"
 module ZeroXDA
   module MarketBrokerBot
     class BrokerRegistry
-      Broker = Data.define(:telegram_user_id, :chat_id, :status, :role)
+      Broker = Data.define(:telegram_user_id, :chat_id, :status, :role, :authorized)
       STATUSES = %w[ready busy paused].freeze
       ROLES = %w[broker admin].freeze
 
@@ -24,7 +24,8 @@ module ZeroXDA
           telegram_user_id: telegram_user_id.to_s,
           chat_id: chat_id.to_s,
           status: status,
-          role: role
+          role: role,
+          authorized: true
         )
         @monitor.synchronize { @brokers[broker.telegram_user_id] = broker }
         broker
@@ -40,7 +41,8 @@ module ZeroXDA
             telegram_user_id: telegram_user_id.to_s,
             chat_id: chat_id.to_s,
             status: "paused",
-            role: "broker"
+            role: "broker",
+            authorized: false
           )
         end
       end

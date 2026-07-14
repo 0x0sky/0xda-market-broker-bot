@@ -62,13 +62,13 @@ class BotTest < Minitest::Test
 
     command_set = @telegram.command_sets.last
     assert_equal({ type: "chat", chat_id: "770" }, command_set.fetch(:scope))
-    assert_equal %w[pause status], command_names(command_set)
+    assert_equal %w[list pause status], command_names(command_set)
   end
 
   def test_paused_chat_shows_ready_but_hides_start_and_pause_commands
     @bot.handle(update("/pause"))
 
-    assert_equal %w[ready status], command_names(@telegram.command_sets.last)
+    assert_equal %w[list ready status], command_names(@telegram.command_sets.last)
   end
 
   def test_busy_chat_shows_only_status
@@ -76,7 +76,7 @@ class BotTest < Minitest::Test
 
     @bot.handle(update("/status"))
 
-    assert_equal %w[status], command_names(@telegram.command_sets.last)
+    assert_equal %w[list status], command_names(@telegram.command_sets.last)
     assert_includes @telegram.messages.last.fetch(:text), "status: busy"
   end
 
@@ -86,6 +86,38 @@ class BotTest < Minitest::Test
 
       assert_includes command_names(@telegram.command_sets.last), "servers"
     end
+  end
+
+  def test_cold_status_does_not_expose_list_product_before_authorization
+    @bot.handle(update("/status"))
+
+    assert_equal %w[ready status], command_names(@telegram.command_sets.last)
+    refute_includes command_names(@telegram.command_sets.last), "list"
+  end
+
+  def test_authorized_broker_can_open_the_nine_product_listing_catalog
+    @bot.handle(update("/list"))
+
+    message = @telegram.messages.last
+    assert_equal "обери продукт для виставлення:", message.fetch(:text)
+    rows = message.dig(:reply_markup, :inline_keyboard)
+    assert_equal [3, 3, 3], rows.map(&:length)
+    buttons = rows.flatten
+    assert_equal "add_premium_3m", buttons.first.fetch(:callback_data)
+    assert_equal "add_eth", buttons.last.fetch(:callback_data)
+    assert_equal 1, @market.product_requests
+    assert_includes command_names(@telegram.command_sets.last), "list"
+  end
+
+  def test_add_callback_reauthenticates_the_broker_and_acknowledges_selection
+    @bot.handle(callback("add_ton"))
+
+    assert_equal 1, @market.requests.length
+    assert_equal 1, @market.product_requests
+    assert_equal(
+      { callback_query_id: "callback-1", text: "обрано: TON" },
+      @telegram.answered_callbacks.last
+    )
   end
 
   def test_admin_can_see_server_status
@@ -112,7 +144,7 @@ class BotTest < Minitest::Test
     %w[/start /ready /pause].each { |command| @bot.handle(update(command)) }
 
     assert_equal "busy", @registry.status(77)
-    assert_equal %w[status], command_names(@telegram.command_sets.last)
+    assert_equal %w[list status], command_names(@telegram.command_sets.last)
   end
 
   def test_ignores_unknown_messages_and_non_private_chats
@@ -166,6 +198,24 @@ class BotTest < Minitest::Test
           "language_code" => "uk"
         },
         "chat" => { "id" => chat_id, "type" => chat_type }
+      }
+    }
+  end
+
+  def callback(data, user_id: 77, chat_id: 770)
+    {
+      "callback_query" => {
+        "id" => "callback-1",
+        "data" => data,
+        "from" => {
+          "id" => user_id,
+          "username" => "zero",
+          "first_name" => "Sasha",
+          "language_code" => "uk"
+        },
+        "message" => {
+          "chat" => { "id" => chat_id, "type" => "private" }
+        }
       }
     }
   end

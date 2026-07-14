@@ -26,6 +26,12 @@ module ZeroXDA
         post("deleteMessage", chat_id: chat_id, message_id: message_id)
       end
 
+      def answer_callback_query(callback_query_id:, text: nil)
+        payload = { callback_query_id: callback_query_id }
+        payload[:text] = text if text
+        post("answerCallbackQuery", payload)
+      end
+
       def set_webhook(url:, secret_token:)
         post(
           "setWebhook",
