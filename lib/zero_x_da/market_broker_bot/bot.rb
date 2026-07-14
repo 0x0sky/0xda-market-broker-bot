@@ -7,7 +7,7 @@ require_relative "telegram_api"
 module ZeroXDA
   module MarketBrokerBot
     class Bot
-      SERVER_START_NOTICE = "сервер запускається…"
+      SERVER_START_NOTICE = "0xda-market запускається…"
       SERVER_START_NOTICE_DELAY = 3
       START_COMMANDS = [
         { command: "start", description: "авторизація брокера" }
