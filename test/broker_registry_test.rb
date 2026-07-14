@@ -9,6 +9,7 @@ class BrokerRegistryTest < Minitest::Test
     registry.set_status(telegram_user_id: 77, chat_id: 770, status: "ready")
     assert_equal "ready", registry.status("77")
     assert_equal "broker", registry.fetch(77, chat_id: 770).role
+    assert registry.fetch(77, chat_id: 770).authorized
   end
 
   def test_rejects_an_unknown_status
@@ -33,6 +34,7 @@ class BrokerRegistryTest < Minitest::Test
     unknown = registry.fetch(77, chat_id: 770)
     assert_equal "paused", unknown.status
     assert_equal "broker", unknown.role
+    refute unknown.authorized
 
     registry.set_status(
       telegram_user_id: 99,

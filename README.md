@@ -13,14 +13,21 @@ ready to receive new requests.
 - `/pause` — pause new request notifications;
 - `/status` — show the persisted market role and current bot status; the response
   is removed after three seconds.
+- `/list` — open the product catalog and choose a product to list (authenticated
+  broker context only).
 - `/servers` — show core and broker-bot health with UTC server times (admin only).
 
 The default Telegram menu exposes only `/start`. After authentication, the
 private chat command scope follows the current broker status:
 
-- `paused` — `/ready` and `/status`;
-- `ready` — `/pause` and `/status`;
-- `busy` — `/status` only.
+- `paused` — `/list`, `/ready` and `/status`;
+- `ready` — `/list`, `/pause` and `/status`;
+- `busy` — `/list` and `/status`.
+
+Before broker authentication, even a cold-start `/status` response omits
+`/list`. The command loads `GET /operator/v1/products` from the core and renders
+the first nine products as a 3×3 inline keyboard. Product callbacks use the
+stable `add_<sku>` contract; catalog rows are never hardcoded in the bot.
 
 An administrator also receives `/servers` in every authenticated broker-state
 menu. Brokers do not see it, and manually typing it is denied after the
