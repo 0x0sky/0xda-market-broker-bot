@@ -1,18 +1,46 @@
-services:
-  - type: web
-    name: 0xda-market-broker-bot
-    runtime: docker
-    plan: free
-    region: frankfurt
-    healthCheckPath: /health
-    envVars:
-      - key: TELEGRAM_BOT_TOKEN
-        sync: false
-      - key: TELEGRAM_WEBHOOK_SECRET
-        generateValue: true
-      - key: MARKET_API_URL
-        value: https://zeroxda-market.onrender.com
-      - key: MARKET_OPERATOR_TOKEN
-        sync: false
-      - key: PUBLIC_URL
-        sync: false
+projects:
+  - name: 0xda-market
+    environments:
+      - name: Test
+        services:
+          - type: web
+            name: 0xda-market-test-broker-bot
+            runtime: docker
+            plan: free
+            region: frankfurt
+            branch: master
+            healthCheckPath: /health
+            autoDeployTrigger: checksPass
+            envVars:
+              - key: TELEGRAM_BOT_TOKEN
+                sync: false
+              - key: TELEGRAM_WEBHOOK_SECRET
+                sync: false
+              - key: MARKET_API_URL
+                value: https://zeroxda-market-test.onrender.com
+              - key: MARKET_OPERATOR_TOKEN
+                sync: false
+              - key: PUBLIC_URL
+                value: https://zeroxda-market-test-broker-bot.onrender.com
+
+      - name: Production
+        services:
+          - type: web
+            name: 0xda-market-broker-bot
+            runtime: docker
+            plan: free
+            region: frankfurt
+            branch: release
+            healthCheckPath: /health
+            autoDeployTrigger: checksPass
+            envVars:
+              - key: TELEGRAM_BOT_TOKEN
+                sync: false
+              - key: TELEGRAM_WEBHOOK_SECRET
+                sync: false
+              - key: MARKET_API_URL
+                value: https://zeroxda-market.onrender.com
+              - key: MARKET_OPERATOR_TOKEN
+                sync: false
+              - key: PUBLIC_URL
+                value: https://zeroxda-market-broker-bot.onrender.com
