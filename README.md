@@ -42,15 +42,27 @@ Broker presence is currently process-local. Durable presence and pending-task
 notifications belong to the next queue-delivery step; the broker identity and
 role are already persisted by the market core.
 
-## Environment
+## Environments
+
+Test and production use separate Telegram bots and Render services. Code reaches
+production through a pull request from `master` to the protected `release`
+branch. Render deploys only after the `test` CI check passes.
+
+| | test | production |
+| --- | --- | --- |
+| Git branch | `master` | `release` |
+| Render service | `0xda-market-test-broker-bot` | `0xda-market-broker-bot` |
+| `MARKET_API_URL` | `https://zeroxda-market-test.onrender.com` | `https://zeroxda-market.onrender.com` |
+| `MARKET_OPERATOR_TOKEN` | test core `MANUAL_PROVIDER_TOKEN` | production core `MANUAL_PROVIDER_TOKEN` |
 
 - `TELEGRAM_BOT_TOKEN` — token for `@zeroxda_market_broker_bot`;
-- `TELEGRAM_WEBHOOK_SECRET` — generated random webhook secret;
-- `MARKET_API_URL` — defaults to `https://zeroxda-market.onrender.com`;
+- `TELEGRAM_WEBHOOK_SECRET` — random webhook secret for Telegram requests;
+- `MARKET_API_URL` — matching core URL for the same environment;
 - `MARKET_OPERATOR_TOKEN` — must equal the core `MANUAL_PROVIDER_TOKEN`;
 - `PUBLIC_URL` — deployed broker-bot URL without a trailing slash.
 
-Secrets must be configured in Render and must not be committed.
+Secrets must be configured separately on each Render service and must not be
+committed.
 
 ## Run
 
